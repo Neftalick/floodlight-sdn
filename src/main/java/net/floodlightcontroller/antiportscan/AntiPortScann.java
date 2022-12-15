@@ -196,8 +196,15 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
                 if (tcp.getFlags() == (short) 0x02) {
                     int scannedPort = tcp.getDestinationPort().getPort();
                     IPv4Address ipDestino = ip.getDestinationAddress();
+
                     if (hostQueries.get(ipDestino) == null) {
-                        PortScanSuspect portScanSuspectNew = new PortScanSuspect();/*Insertar todos los parametros */
+
+                        PortScanSuspect portScanSuspectNew = new PortScanSuspect();
+                        portScanSuspectNew.setAckCounter(0);
+                        portScanSuspectNew.setDestMACAddress(eth.getDestinationMACAddress());
+                        portScanSuspectNew.setSourceMACAddress(eth.getSourceMACAddress());
+                        portScanSuspectNew.setSynAckCounter(0);
+                        portScanSuspectNew.setStartTime(System.nanoTime());
                         hostQueries.put(ipDestino, portScanSuspectNew);
                     }
                     PortScanSuspect portScanSuspect = hostQueries.get(ipDestino);
@@ -214,17 +221,14 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
 
                         if (timeDifSec < thresholdTime) {
                             int thresholdSuspect =  hostToSyn.size()-hostToSynAck.size();
-                            if (thresholdSuspect > thresholdCantPorts)
-                                ret = Command.CONTINUE;
+                            if (thresholdSuspect > thresholdCantPorts) ret = Command.CONTINUE;
                             else {
                                 if (log.isTraceEnabled())
                                     log.trace("Anti port scann entre {} y {}",
                                             new Object[]{eth.getSourceMACAddress(), eth.getDestinationMACAddress()});
                                 ret = Command.STOP;
                             }
-                        }else
-                            hostToSyn.remove(sourceMac);
-
+                        }else hostToSyn.remove(sourceMac);
                     } else {
                         // Si no est�, agregarlo al map de contadores SYN, SYN-ACK y al de tiempo (con la hora actual)
                         hostToSyn.put(sourceMac, scannedPort);
@@ -248,10 +252,6 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
                 }
             }
         }
-
-
-
-
 
         return ret;
     }
