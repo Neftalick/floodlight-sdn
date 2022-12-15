@@ -69,7 +69,7 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                     //Validamos que la Ip origen no provenga de un servicio
                     boolean isService = false;
                     List<String> listaServicios = new ArrayList<>();
-                    listaServicios.add("192.168.5.201");
+                    /**listaServicios.add("192.168.5.201");
                     listaServicios.add("192.168.5.202");
                     listaServicios.add("192.168.5.203");
                     listaServicios.add("192.168.5.204");
@@ -80,7 +80,7 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                     listaServicios.add("192.168.5.209");
                     listaServicios.add("192.168.5.210");
                     listaServicios.add("192.168.5.211");
-                    listaServicios.add("192.168.5.212");
+                    listaServicios.add("192.168.5.212");**/
                     //Obtenemos todos los servicios
                     try {
                         Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
@@ -104,7 +104,7 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                     }
 
                     //Verificamos que no sea un paquete del controlador
-                    if (!iPv4.getSourceAddress().toString().equals("192.168.5.200") && !isService){
+                    if (!iPv4.getSourceAddress().toString().equals("192.168.5.200") && !isService && !iPv4.getDestinationAddress().toString().equals("192.168.5.200")){
                         //Casteo a string del ip
                         boolean usuarioPerteneceServicio = false;
                         List<String> usuariosPertenecenServicio = new ArrayList<>();
