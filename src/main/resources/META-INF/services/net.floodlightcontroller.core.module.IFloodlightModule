@@ -31,3 +31,4 @@ net.floodlightcontroller.statistics.StatisticsCollector
 net.floodlightcontroller.mactracker.MACTracker
 net.floodlightcontroller.proxyarp.ARPProxy
 net.floodlightcontroller.circuittree.CircuitTreeManager
+net.floodlightcontroller.forwarding.Clustering
