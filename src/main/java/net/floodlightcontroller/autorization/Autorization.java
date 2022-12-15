@@ -111,6 +111,8 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         String usuario = "";
                         String ipv4Source = iPv4.getSourceAddress().toString();
                         String ipv4Dest = iPv4.getDestinationAddress().toString();
+                        logger.info(iPv4.getProtocol().toString());
+
                         logger.info("MAC, IP origen :");
                         logger.info(sourceMac);
                         logger.info(ipv4Source);
