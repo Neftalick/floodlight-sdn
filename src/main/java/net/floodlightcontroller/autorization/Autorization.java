@@ -38,12 +38,12 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
 
     @Override
     public boolean isCallbackOrderingPrereq(OFType type, String name) {
-        return (type.equals(OFType.PACKET_IN) && name.equals("forwarding"));
+        return false;
     }
 
     @Override
     public boolean isCallbackOrderingPostreq(OFType type, String name) {
-        return false;
+        return (type.equals(OFType.PACKET_IN) && name.equals("forwarding"));
     }
 
     @Override
