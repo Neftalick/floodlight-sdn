@@ -51,33 +51,57 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
         //Debemos obtener la mac e ip de la petición
         switch (msg.getType()) {
             case PACKET_IN:
+                boolean existeUsuario = false;
                 Ethernet ethernet =
                         IFloodlightProviderService.bcStore.get(cntx,
                                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-
                 if (!ethernet.isBroadcast() && ethernet.getEtherType() == EthType.IPv4) {
-                    Boolean ipv4Flag = false;
                     //Casteo a string de la mac
                     String sourceMac = ethernet.getSourceMACAddress().toString();
                     IPv4 iPv4 = (IPv4) ethernet.getPayload();
+                    try {
+                        Class.forName("com.mysql.cj.jdbc.Driver");
+                    } catch (ClassNotFoundException e) {
+                        logger.info("problema con el driver");
+                        System.out.println("efectivamente problema con el dirver");
+                        e.printStackTrace();
+                    }
+                    //Validamos que la Ip origen no provenga de un servicio
+                    boolean isService = false;
+                    List<String> listaServicios = new ArrayList<>();
+                    //Obtenemos todos los servicios
+                    try {
+                        Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
+                        try (Statement stmt = conn.createStatement()) {
+                            System.out.println(stmt.toString());
+                            ResultSet resultSet = stmt.executeQuery("SELECT * FROM servicio");
+                            while (resultSet.next()) {
+                                listaServicios.add(resultSet.getString("IP"));
+                            }
+                            logger.info("Servicio (IPs)");
+                            for (String element:listaServicios) {
+                                logger.info(element);
+                            }
+                            isService = listaServicios.contains(iPv4.getSourceAddress().toString());
+                        } catch (SQLException sqlException) {
+                            logger.info("Error");
+                            System.out.println("error de conexion con la db");
+                        }
+                    } catch (SQLException e) {
+                        logger.info(e.getMessage());
+                    }
+
                     //Verificamos que no sea un paquete del controlador
-                    if (!iPv4.getSourceAddress().toString().equals("192.168.5.200")){
+                    if (!iPv4.getSourceAddress().toString().equals("192.168.5.200") && !isService){
                         //Casteo a string del ip
                         boolean usuarioPerteneceServicio = false;
                         List<String> usuariosPertenecenServicio = new ArrayList<>();
-                        String usuario;
+                        String usuario = "";
                         String ipv4Source = iPv4.getSourceAddress().toString();
                         String ipv4Dest = iPv4.getDestinationAddress().toString();
                         logger.info(sourceMac);
                         logger.info(ipv4Source);
                         logger.info(ipv4Dest);
-                        try {
-                            Class.forName("com.mysql.cj.jdbc.Driver");
-                        } catch (ClassNotFoundException e) {
-                            logger.info("problema con el driver");
-                            System.out.println("efectivamente problema con el dirver");
-                            e.printStackTrace();
-                        }
                         //Obtenemos el usuario relacionado con el equipo que inicia la conexión
                         try {
                             Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/usuarios_autenticados?useSSL=false", "ubuntu", "ubuntu");
@@ -89,6 +113,7 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                                 while (resultSet.next()) {
                                     System.out.println("Usuario obtenido: "+String.valueOf(resultSet.getInt("idUsuario_Autenticado")));
                                     usuario = String.valueOf(resultSet.getInt("idUsuario_Autenticado"));
+                                    existeUsuario = true;
                                 }
                             } catch (SQLException sqlException) {
                                 logger.info("Error");
@@ -97,25 +122,32 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         } catch (SQLException e) {
                             logger.info(e.getMessage());
                         }
-                        try {
-                            Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
-                            try (PreparedStatement stmt = conn.prepareStatement("SELECT p.usuario FROM servicio s inner join servicio_has_participantes sp on sp.Servicio_idServicio = s.idServicio inner join participantes p on sp.Participantes_idParticipantes = p.idParticipantes where s.IP = ? ")) {
-                                stmt.setString(1,ipv4Dest);
-                                System.out.println(stmt.toString());
-                                ResultSet resultSet = stmt.executeQuery();
-                                while (resultSet.next()) {
-                                    System.out.println("Usuario obtenido perteneciente al servicio: "+String.valueOf(resultSet.getInt("usuario")));
-                                    usuariosPertenecenServicio.add(String.valueOf(resultSet.getInt("usuario")));
+                        if (existeUsuario){
+                            try {
+                                Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
+                                try (PreparedStatement stmt = conn.prepareStatement("SELECT p.usuario FROM servicio s inner join servicio_has_participantes sp on sp.Servicio_idServicio = s.idServicio inner join participantes p on sp.Participantes_idParticipantes = p.idParticipantes where s.IP = ? ")) {
+                                    stmt.setString(1, ipv4Dest);
+                                    System.out.println(stmt.toString());
+                                    ResultSet resultSet = stmt.executeQuery();
+                                    while (resultSet.next()) {
+                                        System.out.println("Usuario obtenido perteneciente al servicio: " + String.valueOf(resultSet.getInt("usuario")));
+                                        usuariosPertenecenServicio.add(String.valueOf(resultSet.getInt("usuario")));
+                                    }
+                                    usuarioPerteneceServicio = usuariosPertenecenServicio.contains(usuario);
+                                } catch (SQLException sqlException) {
+                                    logger.info("Error");
+                                    System.out.println("error de conexion con la db");
                                 }
-                            } catch (SQLException sqlException) {
-                                logger.info("Error");
-                                System.out.println("error de conexion con la db");
+                            } catch (SQLException e) {
+                                logger.info(e.getMessage());
                             }
-                        } catch (SQLException e) {
-                            logger.info(e.getMessage());
+                        }else {
+                            return Command.STOP;
                         }
-
-
+                        return usuarioPerteneceServicio?Command.CONTINUE:Command.STOP;
+                    }else {
+                        logger.info("Se salto porque es un servicio el modulo de autorización");
+                        return Command.CONTINUE;
                     }
                 }
                 break;
