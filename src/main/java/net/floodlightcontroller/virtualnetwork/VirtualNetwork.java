@@ -16,13 +16,20 @@
 
 package net.floodlightcontroller.virtualnetwork;
 
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.MacAddress;
+import org.projectfloodlight.openflow.types.OFPort;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import net.floodlightcontroller.devicemanager.SwitchPort;
 
 /**
  * Data structure for storing and outputing information of a virtual network created
@@ -35,8 +42,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 public class VirtualNetwork{
     protected String name; // network name
     protected String guid; // network id
-    protected String gateway; // network gateway
-	protected Map<String, MacAddress> portToMac; //port's logical namd and the host's mac address connected
+	protected Map<MacAddress,Integer> hosts; //host's mac address connected
+	protected Map<DatapathId,Set<OFPort>> switch2ports;
     /**
      * Constructor requires network name and id
      * @param name: network name
@@ -45,8 +52,8 @@ public class VirtualNetwork{
     public VirtualNetwork(String name, String guid) {
         this.name = name;
         this.guid = guid;
-        this.gateway = null;
-		this.portToMac = new ConcurrentHashMap<String,MacAddress>();
+		this.hosts = new ConcurrentHashMap<MacAddress,Integer>();
+		this.switch2ports = new ConcurrentHashMap<DatapathId,Set<OFPort>>();
         return;        
     }
 
@@ -60,21 +67,19 @@ public class VirtualNetwork{
     }
     
     /**
-     * Sets network gateway IP address
-     * @param gateway: IP address as String
-     */
-    public void setGateway(String gateway){
-        this.gateway = gateway;
-        return;                
-    }
-    
-    /**
      * Adds a host to this network record
      * @param host: MAC address as MACAddress
      */
-    public void addHost(String port, MacAddress host){
-        this.portToMac.put(port, host); // ignore old mapping
-        return;         
+    public void addHost(MacAddress host,Integer type, SwitchPort swports){
+        this.hosts.put(host,type); // ignore old mapping
+        if(this.switch2ports.get(swports.getSwitchDPID())!=null){
+        	this.switch2ports.get(swports.getSwitchDPID()).add(swports.getPort());
+        }else{
+        	Set<OFPort> portList = new HashSet<OFPort>();
+        	portList.add(swports.getPort());
+        	this.switch2ports.put(swports.getSwitchDPID(), portList);
+        }
+        return;
     }
     
     /**
@@ -82,20 +87,50 @@ public class VirtualNetwork{
      * @param host: MAC address as MACAddress
      * @return boolean: true: removed, false: host not found
      */
-    public boolean removeHost(MacAddress host){
-		for (Entry<String, MacAddress> entry : this.portToMac.entrySet()) {
-			if (entry.getValue().equals(host)){
-				this.portToMac.remove(entry.getKey());
-				return true;
-			}
-		}
-		return false;
+    public boolean removeHost(MacAddress mac,Integer type, SwitchPort swport){
+    	Integer l=null;
+    	if(type==0){
+    		l=this.hosts.remove(mac);
+    		this.switch2ports.get(swport.getSwitchDPID()).remove(swport);
+    	}
+    	//If it is different from 0, we remove only if rule type matches
+    	else if(type!=0){
+    		for (Entry<MacAddress,Integer > entry : this.hosts.entrySet()) {
+    			if (entry.getValue().equals(type)&&entry.getKey().equals(mac)){
+    				l= this.hosts.remove(entry.getKey());
+    				this.switch2ports.get(swport.getSwitchDPID()).remove(swport);
+    				return true;
+    			}
+    		}
+    	}
+    	return l==null?false:true;
     }
     
     /**
      * Removes all hosts from this network record
      */
     public void clearHosts(){
-		this.portToMac.clear();
+		this.hosts.clear();
     }
+    
+    /**Returns a map of hosts
+     * 
+     * @return
+     */
+    public Set<MacAddress> getHosts(){
+    	return this.hosts.keySet();
+    	
+    }
+    
+    public Map<DatapathId,Set<OFPort>> getAps(){
+    	return this.switch2ports;
+    }
+    
+    /*
+     public List<MacAddress> getHosts(){
+    	List<MacAddress> list= new ArrayList<MacAddress>();
+    	 list.addAll(this.hosts.keySet());
+    	 return list;
+    	    }
+     */
 }

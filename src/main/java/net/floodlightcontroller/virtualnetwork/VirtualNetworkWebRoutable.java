@@ -25,12 +25,14 @@ import net.floodlightcontroller.restserver.RestletRoutable;
 public class VirtualNetworkWebRoutable implements RestletRoutable {
 
     @Override
-    public Restlet getRestlet(Context context) {
+    public Router getRestlet(Context context) {
         Router router = new Router(context);
         router.attach("/tenants/{tenant}/networks", NetworkResource.class); // GET
         router.attach("/tenants/{tenant}/networks/{network}", NetworkResource.class); // PUT, DELETE
         router.attach("/tenants/{tenant}/networks", NetworkResource.class); // POST
-        router.attach("/tenants/{tenant}/networks/{network}/ports/{port}/attachment", HostResource.class);
+        router.attach("/tenants/{tenant}/rules/type/{type}/network/{vnid}", RuleResource.class);
+        router.attach("/tenants/{tenant}/rules/type/{type}/network/{vnid}", RuleResource.class);
+        router.attach("/tenants/{tenant}/networks/filter/{network}", IsolatingResource.class);
         router.attachDefault(NoOp.class);
         return router;
     }
