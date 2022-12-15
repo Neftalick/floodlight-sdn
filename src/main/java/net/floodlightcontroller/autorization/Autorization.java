@@ -69,6 +69,18 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                     //Validamos que la Ip origen no provenga de un servicio
                     boolean isService = false;
                     List<String> listaServicios = new ArrayList<>();
+                    listaServicios.add("192.168.5.201");
+                    listaServicios.add("192.168.5.202");
+                    listaServicios.add("192.168.5.203");
+                    listaServicios.add("192.168.5.204");
+                    listaServicios.add("192.168.5.205");
+                    listaServicios.add("192.168.5.206");
+                    listaServicios.add("192.168.5.207");
+                    listaServicios.add("192.168.5.208");
+                    listaServicios.add("192.168.5.209");
+                    listaServicios.add("192.168.5.210");
+                    listaServicios.add("192.168.5.211");
+                    listaServicios.add("192.168.5.212");
                     //Obtenemos todos los servicios
                     try {
                         Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
