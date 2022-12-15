@@ -99,8 +99,10 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         String usuario = "";
                         String ipv4Source = iPv4.getSourceAddress().toString();
                         String ipv4Dest = iPv4.getDestinationAddress().toString();
+                        logger.info("MAC, IP origen :");
                         logger.info(sourceMac);
                         logger.info(ipv4Source);
+                        logger.info("IP destino: ");
                         logger.info(ipv4Dest);
                         //Obtenemos el usuario relacionado con el equipo que inicia la conexión
                         try {
@@ -108,8 +110,8 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                             try (PreparedStatement stmt = conn.prepareStatement("SELECT * FROM usuario_autenticado where Dispositivo_dispositivo_MAC = ? and IP = ?")) {
                                 stmt.setString(1, sourceMac);
                                 stmt.setString(2, ipv4Source);
-                                System.out.println("Busca del usuario");
-                                System.out.println(stmt.toString());
+                                //System.out.println("Busca del usuario");
+                                //System.out.println(stmt.toString());
                                 ResultSet resultSet = stmt.executeQuery();
                                 while (resultSet.next()) {
                                     System.out.println("Usuario obtenido: "+String.valueOf(resultSet.getInt("idUsuario_Autenticado")));
@@ -146,15 +148,18 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                                 logger.info(e.getMessage());
                             }
                         }else {
+                            logger.info("Petición bloqueada");
                             return Command.STOP;
                         }
                         if (usuarioPerteneceServicio){
+                            logger.info("Paquete autorizado");
                             return Command.CONTINUE;
                         }else {
+                            logger.info("Petición bloqueada");
                             return Command.STOP;
                         }
                     }else {
-                        logger.info("Se salto porque es un servicio el modulo de autorización");
+                        logger.info("Se salto el modulo de autorización porque es un servicio");
                         return Command.CONTINUE;
                     }
                 }
