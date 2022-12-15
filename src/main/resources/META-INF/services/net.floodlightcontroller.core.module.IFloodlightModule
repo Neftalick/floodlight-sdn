@@ -29,4 +29,7 @@ net.floodlightcontroller.dhcpserver.DHCPServer
 net.floodlightcontroller.learningswitch.LearningSwitch
 net.floodlightcontroller.statistics.StatisticsCollector
 net.floodlightcontroller.mactracker.MACTracker
+net.floodlightcontroller.proxyarp.ARPProxy
+net.floodlightcontroller.circuittree.CircuitTreeManager
+net.floodlightcontroller.forwarding.Clustering
 net.floodlightcontroller.antiportscan.AntiPortScann
