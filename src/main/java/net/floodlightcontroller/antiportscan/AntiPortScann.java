@@ -226,7 +226,7 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
                                 if (log.isTraceEnabled())
                                     log.trace("Anti port scann entre {} y {}",
                                             new Object[]{eth.getSourceMACAddress(), eth.getDestinationMACAddress()});
-                                ret = Command.STOP;
+
                             }
                         }else hostToSyn.remove(sourceMac);
                     } else {
