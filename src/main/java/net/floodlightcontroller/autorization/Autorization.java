@@ -9,9 +9,7 @@ import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
-import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.packet.IPacket;
-import net.floodlightcontroller.packet.IPv4;
+import net.floodlightcontroller.packet.*;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.types.EthType;
@@ -19,10 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Autorization implements IOFMessageListener, IFloodlightModule {
     //Variables necesarias
@@ -109,14 +104,41 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         boolean usuarioPerteneceServicio = false;
                         List<String> usuariosPertenecenServicio = new ArrayList<>();
                         String usuario = "";
+                        Map<String, String> PROTOCOLOS = new HashMap<String, String>();
+                        PROTOCOLOS.put("0x6","TCP");
+                        PROTOCOLOS.put("0x1","ICMP");
+                        PROTOCOLOS.put("0x17","UDP");
+                        boolean protocoloPermitido = false;
+                        String protocoloL4 = PROTOCOLOS.get(iPv4.getProtocol().toString());
+                        String puerto = "";
+                        switch (protocoloL4){
+                            case "TCP":
+                                TCP tcp = (TCP) iPv4.getPayload();
+                                puerto = tcp.getDestinationPort().toString();
+                                protocoloPermitido = true;
+                                break;
+                            case "UDP":
+                                UDP udp = (UDP) iPv4.getPayload();
+                                puerto = udp.getDestinationPort().toString();
+                                protocoloPermitido = true;
+                                break;
+                            case "ICMP":
+                                ICMP icmp = (ICMP) iPv4.getPayload();
+                                puerto = "";
+                                protocoloPermitido = true;
+                                break;
+                            default:
+                                protocoloPermitido = false;
+                                break;
+
+                        }
                         String ipv4Source = iPv4.getSourceAddress().toString();
                         String ipv4Dest = iPv4.getDestinationAddress().toString();
-                        logger.info(iPv4.getProtocol().toString());
-
                         logger.info("MAC, IP origen :");
                         logger.info(sourceMac);
                         logger.info(ipv4Source);
                         logger.info("IP destino: ");
+                        logger.info(iPv4.getProtocol().toString());
                         logger.info(ipv4Dest);
                         //Obtenemos el usuario relacionado con el equipo que inicia la conexión
                         try {
@@ -141,11 +163,13 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         }
 
                         System.out.println("Estado- existe usuario "+ existeUsuario);
-                        if (existeUsuario){
+                        if (existeUsuario && protocoloPermitido){
                             try {
                                 Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
-                                try (PreparedStatement stmt = conn.prepareStatement("SELECT p.usuario FROM servicio s inner join servicio_has_participantes sp on sp.Servicio_idServicio = s.idServicio inner join participantes p on sp.Participantes_idParticipantes = p.idParticipantes where s.IP = ? ")) {
+                                try (PreparedStatement stmt = conn.prepareStatement("SELECT p.usuario FROM servicio s inner join servicio_has_participantes sp on sp.Servicio_idServicio = s.idServicio inner join participantes p on sp.Participantes_idParticipantes = p.idParticipantes where s.IP = ? AND s.Puerto = ? AND s.Protocolo = ?")) {
                                     stmt.setString(1, ipv4Dest);
+                                    stmt.setString(2, puerto);
+                                    stmt.setString(3, protocoloL4);
                                     System.out.println("Busca de los usuarios enlazados al servicio");
                                     System.out.println(stmt.toString());
                                     ResultSet resultSet = stmt.executeQuery();
