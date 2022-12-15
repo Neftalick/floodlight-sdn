@@ -311,6 +311,11 @@ public class ARPProxy extends TimerTask implements IOFMessageListener, IFloodlig
 		switch (msg.getType()) {
 		case PACKET_IN:
 			IRoutingDecision decision = null;
+			try{
+
+			}catch (Exception e){
+
+			}
 			if (cntx != null) {
 				decision = IRoutingDecision.rtStore.get(cntx, IRoutingDecision.CONTEXT_DECISION);
 			}

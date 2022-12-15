@@ -32,5 +32,4 @@ net.floodlightcontroller.mactracker.MACTracker
 net.floodlightcontroller.proxyarp.ARPProxy
 net.floodlightcontroller.circuittree.CircuitTreeManager
 net.floodlightcontroller.forwarding.Clustering
-net.floodlightcontroller.autorization.Autorization
 net.floodlightcontroller.antiportscan.AntiPortScann

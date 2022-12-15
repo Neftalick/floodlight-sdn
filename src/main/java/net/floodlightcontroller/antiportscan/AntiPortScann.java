@@ -373,6 +373,4 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
         }
     }
  */
-
-
 }
