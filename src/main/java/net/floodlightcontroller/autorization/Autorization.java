@@ -108,6 +108,7 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                             try (PreparedStatement stmt = conn.prepareStatement("SELECT * FROM usuario_autenticado where Dispositivo_dispositivo_MAC = ? and IP = ?")) {
                                 stmt.setString(1, sourceMac);
                                 stmt.setString(2, ipv4Source);
+                                System.out.println("Busca del usuario");
                                 System.out.println(stmt.toString());
                                 ResultSet resultSet = stmt.executeQuery();
                                 while (resultSet.next()) {
@@ -122,11 +123,14 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         } catch (SQLException e) {
                             logger.info(e.getMessage());
                         }
+
+                        System.out.println("Estado- existe usuario "+ existeUsuario);
                         if (existeUsuario){
                             try {
                                 Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/servicios?useSSL=false", "ubuntu", "ubuntu");
                                 try (PreparedStatement stmt = conn.prepareStatement("SELECT p.usuario FROM servicio s inner join servicio_has_participantes sp on sp.Servicio_idServicio = s.idServicio inner join participantes p on sp.Participantes_idParticipantes = p.idParticipantes where s.IP = ? ")) {
                                     stmt.setString(1, ipv4Dest);
+                                    System.out.println("Busca de los usuarios enlazados al servicio");
                                     System.out.println(stmt.toString());
                                     ResultSet resultSet = stmt.executeQuery();
                                     while (resultSet.next()) {
@@ -144,7 +148,11 @@ public class Autorization implements IOFMessageListener, IFloodlightModule {
                         }else {
                             return Command.STOP;
                         }
-                        return usuarioPerteneceServicio?Command.CONTINUE:Command.STOP;
+                        if (usuarioPerteneceServicio){
+                            return Command.CONTINUE;
+                        }else {
+                            return Command.STOP;
+                        }
                     }else {
                         logger.info("Se salto porque es un servicio el modulo de autorización");
                         return Command.CONTINUE;
