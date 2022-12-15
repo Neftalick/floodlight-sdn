@@ -24,7 +24,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
 
-import org.projectfloodlight.openflow.types.IPv4Address;
 import org.restlet.data.Status;
 import org.restlet.resource.Delete;
 import org.restlet.resource.Get;
@@ -40,7 +39,6 @@ public class NetworkResource extends ServerResource {
     public class NetworkDefinition {
         public String name = null;
         public String guid = null;
-        public String gateway = null;
     }
     
     protected void jsonToNetworkDefinition(String json, NetworkDefinition network) throws IOException {
@@ -48,7 +46,7 @@ public class NetworkResource extends ServerResource {
         JsonParser jp;
         
         try {
-            jp = f.createParser(json);
+            jp = f.createJsonParser(json);
         } catch (JsonParseException e) {
             throw new IOException(e);
         }
@@ -73,10 +71,6 @@ public class NetworkResource extends ServerResource {
                     if (field == null) continue;
                     if (field.equals("name")) {
                         network.name = jp.getText();
-                    } else if (field.equals("gateway")) {
-                    	String gw = jp.getText();
-                    	if ((gw != null) && (!gw.equals("null")))
-                    		network.gateway = gw;
                     } else if (field.equals("id")) {
                     	network.guid = jp.getText();
                     } else {
@@ -121,18 +115,8 @@ public class NetworkResource extends ServerResource {
         IVirtualNetworkService vns =
                 (IVirtualNetworkService)getContext().getAttributes().
                     get(IVirtualNetworkService.class.getCanonicalName());
-        
-        IPv4Address gw = null;
-        if (network.gateway != null) {
-            try {
-                gw = IPv4Address.of(network.gateway);
-            } catch (IllegalArgumentException e) {
-                log.warn("Could not parse gateway {} as IP for network {}, setting as null",
-                         network.gateway, network.name);
-                network.gateway = null;
-            }
-        }
-        vns.createNetwork(network.guid, network.name, gw);
+
+        vns.createNetwork(network.guid, network.name);
         setStatus(Status.SUCCESS_OK);
         return "{\"status\":\"ok\"}";
     }

@@ -9,7 +9,7 @@ net.floodlightcontroller.threadpool.ThreadPool
 net.floodlightcontroller.perfmon.PktInProcessingTime
 net.floodlightcontroller.restserver.RestApiServer
 net.floodlightcontroller.ui.web.StaticWebRoutable
-net.floodlightcontroller.virtualnetwork.VirtualNetworkFilter
+net.floodlightcontroller.virtualnetwork.VirtualNetworkManager
 net.floodlightcontroller.devicemanager.internal.DefaultEntityClassifier
 net.floodlightcontroller.core.internal.OFSwitchManager
 net.floodlightcontroller.threadpool.ThreadPool
@@ -30,5 +30,4 @@ net.floodlightcontroller.learningswitch.LearningSwitch
 net.floodlightcontroller.statistics.StatisticsCollector
 net.floodlightcontroller.mactracker.MACTracker
 net.floodlightcontroller.proxyarp.ARPProxy
-net.floodlightcontroller.autorization.Autorization
 net.floodlightcontroller.circuittree.CircuitTreeManager
