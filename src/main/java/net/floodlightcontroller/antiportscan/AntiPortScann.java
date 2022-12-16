@@ -9,20 +9,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
+
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFPacketIn;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
-import org.projectfloodlight.openflow.types.EthType;
 import org.projectfloodlight.openflow.types.IPv4Address;
-import org.projectfloodlight.openflow.types.IpProtocol;
 import org.projectfloodlight.openflow.types.MacAddress;
 import org.projectfloodlight.openflow.types.OFBufferId;
 import org.projectfloodlight.openflow.types.U64;
+import org.projectfloodlight.openflow.types.EthType;
+import org.projectfloodlight.openflow.types.IpProtocol;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,11 +48,11 @@ import net.floodlightcontroller.packet.TCP;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.virtualnetwork.IVirtualNetworkService;
 
-public class AntiPortScann implements IFloodlightModule, IOFMessageListener{
+
+
+public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
 	protected static Logger log = LoggerFactory.getLogger(AntiPortScann.class);
-    private static final long MILLIS_PER_SEC = 1000;
-
-
+	private static final long NANOS_PER_SEC = 1000000000;
 	private static final short APP_ID = 100;
 	static {
 		AppCookie.registerApp(APP_ID, "AntiPortScann");
@@ -63,33 +64,29 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener{
 	IDeviceService deviceService;
 
 	// Our internal state
-	protected Map<MacAddress, String> hostToSyn; // map of host MAC to syn flag counter
-	protected Map<MacAddress, String> hostToSynAck; // map of host MAC to syn-ack flag counter
+	protected Map<MacAddress, Integer> hostToSyn; // map of host MAC to syn flag counter
+	protected Map<MacAddress, Integer> hostToSynAck; // map of host MAC to syn-ack flag counter
 	protected Map<MacAddress, Long > hostToTimestamp; // map of host MAC to timestamp
-	
-	protected Map<IPv4Address, Host> hostsConsultados;
+
 	protected Double thresholdTime;
 	protected Integer thresholdCantPorts;
-	protected ArrayList<MacAddress> hostBlocked;
+	protected Map<IPv4Address, PortScanSuspect> hostQueries;
 
 
 	// IFloodlightModule
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
-		Collection<Class<? extends IFloodlightService>> l =
-				new ArrayList<Class<? extends IFloodlightService>>();
-		l.add(IVirtualNetworkService.class);
-		return l;
+		return null;
 	}
 
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService>
 	getServiceImpls() {
 		Map<Class<? extends IFloodlightService>,
-		IFloodlightService> m =
-		new HashMap<Class<? extends IFloodlightService>,
-		IFloodlightService>();
+				IFloodlightService> m =
+				new HashMap<Class<? extends IFloodlightService>,
+						IFloodlightService>();
 		return m;
 	}
 
@@ -109,8 +106,14 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener{
 		floodlightProviderService = context.getServiceImpl(IFloodlightProviderService.class);
 		restApiService = context.getServiceImpl(IRestApiService.class);
 
-		hostToSyn = new ConcurrentHashMap<MacAddress, String>();
-		hostToSynAck = new ConcurrentHashMap<MacAddress, String>();
+		hostToSyn = new ConcurrentHashMap<MacAddress, Integer>();
+		hostToSynAck = new ConcurrentHashMap<MacAddress, Integer>();
+		hostToTimestamp = new ConcurrentHashMap<MacAddress, Long >();
+
+		thresholdTime = 3.0;
+		thresholdCantPorts = 5;
+		hostQueries = new ConcurrentHashMap<IPv4Address, PortScanSuspect >();
+
 
 	}
 
@@ -141,10 +144,10 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener{
 	@Override
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		switch (msg.getType()) {
-		case PACKET_IN:
-			return processPacketIn(sw, (OFPacketIn)msg, cntx);
-		default:
-			break;
+			case PACKET_IN:
+				return processPacketIn(sw, (OFPacketIn)msg, cntx);
+			default:
+				break;
 		}
 		log.warn("Received unexpected message {}", msg);
 		return Command.CONTINUE;
@@ -164,128 +167,124 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener{
 				IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 		Command ret = Command.STOP;
 
-		// 1. caso TCP SYN
-		
-		// Revisar si la MAC origen está en el MAP de contadores SYN
-		
-		if(!hostBlocked.contains(eth.getSourceMACAddress())) {
-			portScanning(eth);
-			ret = Command.CONTINUE;
-		}
+		//Validacion si es IPv4
+		MacAddress sourceMac = eth.getSourceMACAddress();
+		if (eth.getEtherType().equals(EthType.IPv4)) {
+			IPv4 ip = (IPv4) eth.getPayload();
+			IPv4Address ipDestino = ip.getDestinationAddress();
+			IPv4Address ipFuente = ip.getSourceAddress();
+			//Validacion si es TCP
+			if (ip.getProtocol().equals(IpProtocol.TCP)) {
+				TCP tcp = (TCP) ip.getPayload();
+				int flags=tcp.getFlags();
+				System.out.println("De anti Port Scanner "+ipFuente + "to Destn IPaddress:" + ipDestino + "flags " + flags  );
+				// 1. caso TCP SYN
+				if (tcp.getFlags() == (short) 0x02) {
+					int scannedPort = tcp.getDestinationPort().getPort();
 
-		
-		// Si no está, agregarlo al map de contadores SYN, SYN-ACK y al de tiempo (con la hora actual)
-		
-		// si está, revisar si está dentro de la ventana de analisis, si no está en la ventana de análsis borrarlo del map
-		
-		// si está en la ventana de análisis, revisar si longitud(SYN)-longitud(SYN-ACK)> THRESHOLD
-		
-		// si es TRUE, continuear el pipeline, si es FALSE, DROP
-		
-		// 2. Caso TCP SYN-ACK
-		
-		// Revisar si la MAC origen están al MAP de contadores SYN
-		
-		// Si está, incrementar el contador SYN-ACK
-		
-		if (log.isTraceEnabled())
-			log.trace("Anti port scann entre {} y {}",
-					new Object[] {eth.getSourceMACAddress(), eth.getDestinationMACAddress()});
+
+
+					if (hostQueries.get(ipDestino) == null) {
+
+						PortScanSuspect portScanSuspectNew = new PortScanSuspect();
+						portScanSuspectNew.setAckCounter(0);
+						portScanSuspectNew.setDestMACAddress(eth.getDestinationMACAddress());
+						portScanSuspectNew.setSourceMACAddress(eth.getSourceMACAddress());
+						portScanSuspectNew.setSynAckCounter(0);
+						portScanSuspectNew.setStartTime(System.nanoTime());
+						hostQueries.put(ipDestino, portScanSuspectNew);
+					}
+					PortScanSuspect portScanSuspect = hostQueries.get(ipDestino);
+
+					// Revisar si la MAC origen est� en el MAP de contadores SYN
+					if (hostToSyn.containsKey(sourceMac)) {
+
+						// si est�, revisar si est� dentro de la ventana de analisis, si no est� en la ventana de an�lsis borrarlo del map
+
+						Long startTime = portScanSuspect.getStartTime();
+						double timeDifSec = ((System.nanoTime() - startTime) * 1.0 / NANOS_PER_SEC) ;
+
+						//** revisar si longitud(SYN)-longitud(SYN-ACK)> THRESHOLD
+
+						if (timeDifSec < thresholdTime) {
+							int thresholdSuspect =  hostToSyn.size()-hostToSynAck.size();
+							if (thresholdSuspect > thresholdCantPorts) ret = Command.CONTINUE;
+							else System.out.println("Anti port scann entre "+eth.getSourceMACAddress()+" y "+eth.getDestinationMACAddress());
+
+						}else hostToSyn.remove(sourceMac);
+					} else {
+						// Si no est�, agregarlo al map de contadores SYN, SYN-ACK y al de tiempo (con la hora actual)
+						hostToSyn.put(sourceMac, scannedPort);
+						hostToSynAck.put(sourceMac, scannedPort);
+						hostToTimestamp.put(sourceMac, System.nanoTime());
+					}
+				}
+				// si es TRUE, continuear el pipeline, si es FALSE, DROP
+
+				// 2. Caso TCP SYN-ACK | RESPUESTA DEL SERVIDOR -> "CONTADOR DE VECES RESPONDE UNA SOLICITUD TCP"
+				if (tcp.getFlags() == (short) 0x12) {
+					// Revisar si la MAC origen est�n al MAP de contadores SYN
+					if (hostToSyn.containsKey(sourceMac)) {
+						// Si est�, incrementar el contador SYN-ACK
+						int currentCount = hostToSynAck.get(sourceMac);
+						hostToSynAck.put(sourceMac, currentCount + 1);
+						ret = Command.CONTINUE;
+					}
+
+				}
+			}
+		}
 
 		return ret;
 	}
-	
-	 protected void portScanning(Ethernet eth) {
-	        if (eth.getEtherType().equals(EthType.IPv4)) {
-	            IPv4 ip = (IPv4) eth.getPayload();
-	            if (ip.getProtocol().equals(IpProtocol.TCP)) {
-	                TCP tcp = (TCP) ip.getPayload();
-	                
-	                // 1. caso TCP SYN
-	                
-	                if (tcp.getFlags() == (short) 0x02) {
-	                    IPv4Address ipDestino = ip.getDestinationAddress();
-	                    if (hostsConsultados.get(ipDestino) == null) {
-	                        Host newHost = new Host();
-	                        hostsConsultados.put(ipDestino, newHost);
-	                    }
-	                    Host hostConsultado = hostsConsultados.get(ipDestino);
-	                    
-	                    // Revisar si la MAC origen está en el MAP de contadores SYN
-	        
-	                    MacAddress sourceMac = eth.getSourceMACAddress();
-	                    if (!(hostConsultado.getMapSynRequests().get(sourceMac) == null)) {
-	                    	
-	                        // Agregar el puerto consultado
-	                    	
-	                        hostConsultado.getMapSynRequests().get(sourceMac).add(tcp.getDestinationPort().getPort());
-	                        
-	                        // Revisar si está dentro de la ventana de analisis
-	                        
-	                        Long startTime = hostConsultado.getMapMacTime().get(sourceMac);
-	                        double timeDifSec = ((System.nanoTime() - startTime) * 1.0 / 1000000) / MILLIS_PER_SEC;
-	                        if (timeDifSec < thresholdTime) {
-	                        	
-	                            // Revisar si longitud(SYN)-longitud(SYN-ACK)> THRESHOLD
-	                        	
-	                            if (hostConsultado.getMapSynRequests().get(sourceMac).size() > thresholdCantPorts) {
-	                                hostBlocked.add(sourceMac);
-	                                System.out.println("###### SE DETECTO PORT SCANNING ######");
-	                                System.out.println("-- ATACANTE --");
-	                                System.out.println("mac source: " + sourceMac);
-	                            }
-	                        } else {
-	                        	
-	                            // Si no está en la ventana de análsis borrarlo del MAP
-	                        	
-	                            hostConsultado.getMapSynRequests().remove(sourceMac);
-	                        }
-	                    } else {
-	                    	
-	                        // Si no está, agregarlo al MAP de contadores SYN, SYN-ACK y al de tiempo (con la hora actual)
-	                        //TODO: FALTA AL SYN-ACK
-	                    	
-	                        ArrayList<Integer> lp = new ArrayList<>();
-	                        lp.add(tcp.getDestinationPort().getPort());
-	                        hostConsultado.getMapSynRequests().put(sourceMac, lp);
 
-	                        hostConsultado.getMapMacTime().put(sourceMac, System.nanoTime());
-	                    }
-	                }
-
-	           
-	                /*
-	                
-	                //TODO: CONSULTAR
-	                
-	                // 2. Caso TCP SYN-ACK | RESPUESTA DEL SERVIDOR -> "CONTADOR DE VECES RESPONDE UNA SOLICITUD TCP"
-	                
-	                MacAddress sourceMac = eth.getSourceMACAddress();
-	                
-	                if (tcp.getFlags() == (short) 0x12) {
-	                	
-	                    // Revisar si la MAC origen están al MAP de contadores SYN
-	                	
-	                    if (hostToSyn.containsKey(sourceMac)) {
-	                    	
-	                        // Si está, incrementar el contador SYN-ACK
-	                    	
-	                        String currentCount = hostToSynAck.get(sourceMac);
-	                        hostToSynAck.put(sourceMac, currentCount+1);
-	                    }
-	                }*/
-
-	            }
-	        }
-	    }
-	
 	protected class PortScanSuspect{
 		MacAddress sourceMACAddress;
 		MacAddress destMACAddress;
 		Integer ackCounter;
 		Integer synAckCounter;
+
+		public MacAddress getSourceMACAddress() {
+			return sourceMACAddress;
+		}
+
+		public void setSourceMACAddress(MacAddress sourceMACAddress) {
+			this.sourceMACAddress = sourceMACAddress;
+		}
+
+		public MacAddress getDestMACAddress() {
+			return destMACAddress;
+		}
+
+		public void setDestMACAddress(MacAddress destMACAddress) {
+			this.destMACAddress = destMACAddress;
+		}
+
+		public Integer getAckCounter() {
+			return ackCounter;
+		}
+
+		public void setAckCounter(Integer ackCounter) {
+			this.ackCounter = ackCounter;
+		}
+
+		public Integer getSynAckCounter() {
+			return synAckCounter;
+		}
+
+		public void setSynAckCounter(Integer synAckCounter) {
+			this.synAckCounter = synAckCounter;
+		}
+
 		private long startTime;
-		
+
+		public long getStartTime() {
+			return startTime;
+		}
+
+		public void setStartTime(long startTime) {
+			this.startTime = startTime;
+		}
 	}
 
 }
