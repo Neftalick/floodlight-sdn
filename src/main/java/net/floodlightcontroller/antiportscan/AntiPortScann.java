@@ -196,7 +196,7 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
             if (ip.getProtocol().equals(IpProtocol.TCP)) {
                 TCP tcp = (TCP) ip.getPayload();
                 int flags=tcp.getFlags();
-                log.info("From TRW Scanner "+ipFuente + "to Destn IPaddress:" + ipDestino + "flags " + flags  );
+                System.out.println("De anti Port Scanner "+ipFuente + "to Destn IPaddress:" + ipDestino + "flags " + flags  );
                 // 1. caso TCP SYN
                 if (tcp.getFlags() == (short) 0x02) {
                     int scannedPort = tcp.getDestinationPort().getPort();
@@ -228,12 +228,8 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
                         //if (timeDifSec < thresholdTime) {
                             int thresholdSuspect =  hostToSyn.size()-hostToSynAck.size();
                             if (thresholdSuspect > thresholdCantPorts) ret = Command.CONTINUE;
-                            else {
-                                if (log.isTraceEnabled())
-                                    log.trace("Anti port scann entre {} y {}",
-                                            new Object[]{eth.getSourceMACAddress(), eth.getDestinationMACAddress()});
+                            else System.out.println("Anti port scann entre "+eth.getSourceMACAddress()+" y "+eth.getDestinationMACAddress());
 
-                            }
                         //}else hostToSyn.remove(sourceMac);
                     } else {
                         // Si no est�, agregarlo al map de contadores SYN, SYN-ACK y al de tiempo (con la hora actual)
