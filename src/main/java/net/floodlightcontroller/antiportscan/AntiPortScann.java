@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
+
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFPacketIn;
 import org.projectfloodlight.openflow.protocol.OFType;
@@ -69,7 +70,7 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
 
     protected Double thresholdTime;
     protected Integer thresholdCantPorts;
-    protected Map<IPv4Address, PortScanSuspect> hostQueries;
+    //protected Map<IPv4Address, PortScanSuspect> hostQueries;
 
 
     // IFloodlightModule
@@ -110,8 +111,8 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
         hostToTimestamp = new ConcurrentHashMap<MacAddress, Long >();
 
         thresholdTime = 3.0;
-        thresholdCantPorts = 1600;
-        hostQueries = new ConcurrentHashMap<IPv4Address, PortScanSuspect >();
+        thresholdCantPorts = 5;
+        //hostQueries = new ConcurrentHashMap<IPv4Address, PortScanSuspect >();
 
 
     }
@@ -189,14 +190,19 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
         MacAddress sourceMac = eth.getSourceMACAddress();
         if (eth.getEtherType().equals(EthType.IPv4)) {
             IPv4 ip = (IPv4) eth.getPayload();
+            IPv4Address ipDestino = ip.getDestinationAddress();
+            IPv4Address ipFuente = ip.getSourceAddress();
             //Validacion si es TCP
             if (ip.getProtocol().equals(IpProtocol.TCP)) {
                 TCP tcp = (TCP) ip.getPayload();
+                int flags=tcp.getFlags();
+                log.info("From TRW Scanner "+ipFuente + "to Destn IPaddress:" + ipDestino + "flags " + flags  );
                 // 1. caso TCP SYN
                 if (tcp.getFlags() == (short) 0x02) {
                     int scannedPort = tcp.getDestinationPort().getPort();
-                    IPv4Address ipDestino = ip.getDestinationAddress();
 
+
+                    /*
                     if (hostQueries.get(ipDestino) == null) {
 
                         PortScanSuspect portScanSuspectNew = new PortScanSuspect();
@@ -207,19 +213,19 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
                         portScanSuspectNew.setStartTime(System.nanoTime());
                         hostQueries.put(ipDestino, portScanSuspectNew);
                     }
-                    PortScanSuspect portScanSuspect = hostQueries.get(ipDestino);
+                    PortScanSuspect portScanSuspect = hostQueries.get(ipDestino);*/
 
                     // Revisar si la MAC origen est� en el MAP de contadores SYN
                     if (hostToSyn.containsKey(sourceMac)) {
 
                         // si est�, revisar si est� dentro de la ventana de analisis, si no est� en la ventana de an�lsis borrarlo del map
-
+                        /*
                         Long startTime = portScanSuspect.getStartTime();
                         double timeDifSec = ((System.nanoTime() - startTime) * 1.0 / NANOS_PER_SEC) ;
-
+                        */
                         //** revisar si longitud(SYN)-longitud(SYN-ACK)> THRESHOLD
 
-                        if (timeDifSec < thresholdTime) {
+                        //if (timeDifSec < thresholdTime) {
                             int thresholdSuspect =  hostToSyn.size()-hostToSynAck.size();
                             if (thresholdSuspect > thresholdCantPorts) ret = Command.CONTINUE;
                             else {
@@ -228,11 +234,10 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
                                             new Object[]{eth.getSourceMACAddress(), eth.getDestinationMACAddress()});
 
                             }
-                        }else hostToSyn.remove(sourceMac);
+                        //}else hostToSyn.remove(sourceMac);
                     } else {
                         // Si no est�, agregarlo al map de contadores SYN, SYN-ACK y al de tiempo (con la hora actual)
                         hostToSyn.put(sourceMac, scannedPort);
-                        //TODO: creo que es el mac destino :/
                         hostToSynAck.put(sourceMac, scannedPort);
                         hostToTimestamp.put(sourceMac, System.nanoTime());
                     }
@@ -257,67 +262,6 @@ public class AntiPortScann implements IFloodlightModule, IOFMessageListener {
     }
 
     protected class PortScanSuspect{
-        MacAddress sourceMACAddress;
-        MacAddress destMACAddress;
-        Integer ackCounter;
-        Integer synAckCounter;
-        private long startTime;
-
-
-
-        public MacAddress getSourceMACAddress() {
-            return sourceMACAddress;
-        }
-
-        public void setSourceMACAddress(MacAddress sourceMACAddress) {
-            this.sourceMACAddress = sourceMACAddress;
-        }
-
-        public MacAddress getDestMACAddress() {
-            return destMACAddress;
-        }
-
-        public void setDestMACAddress(MacAddress destMACAddress) {
-            this.destMACAddress = destMACAddress;
-        }
-
-        public Integer getAckCounter() {
-            return ackCounter;
-        }
-
-        public void setAckCounter(Integer ackCounter) {
-            this.ackCounter = ackCounter;
-        }
-
-        public Integer getSynAckCounter() {
-            return synAckCounter;
-        }
-
-        public void setSynAckCounter(Integer synAckCounter) {
-            this.synAckCounter = synAckCounter;
-        }
-
-        public long getStartTime() {
-            return startTime;
-        }
-
-        public void setStartTime(long startTime) {
-            this.startTime = startTime;
-        }
-
-        public PortScanSuspect(MacAddress sourceMACAddress, MacAddress destMACAddress, Integer ackCounter,
-                               Integer synAckCounter, long startTime) {
-            super();
-            this.sourceMACAddress = sourceMACAddress;
-            this.destMACAddress = destMACAddress;
-            this.ackCounter = ackCounter;
-            this.synAckCounter = synAckCounter;
-            this.startTime = startTime;
-        }
-
-        public PortScanSuspect() {
-        }
-
 
     }
 	/*protected void portScanning(Ethernet eth) {
